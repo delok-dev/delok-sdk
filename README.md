@@ -199,28 +199,3 @@ delok.fatal({
 * ESM and CommonJS builds
 
 ---
-
-## Roadmap
-
-### SDK
-
-* Retry mechanism
-* Batch log delivery
-* Offline queue support
-* Browser unload handling
-* Node.js runtime support
-* React integration utilities
-
-### Platform
-
-* Real-time log viewer
-* Search and filtering
-* Error analytics
-* Alerting system
-* AI-powered anomaly detection
-
----
-
-## License
-
-MIT License
