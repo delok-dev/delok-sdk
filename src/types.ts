@@ -1,8 +1,11 @@
+// /src/types.ts
+
 export type LogLevel = "info" | "warn" | "error" | "fatal";
+export type Environment = "development" | "staging" | "production " | "CI / CD";
 
 export interface DelokConfig {
   apiKey: string;
-  environment: string;
+  environment: Environment;
 }
 
 export interface TrackPayload {

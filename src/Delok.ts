@@ -1,18 +1,26 @@
+// /src/Delok.ts
+
 import { sendLog } from "./transport";
 
-import { DelokConfig, TrackPayload } from "./types";
+import { DelokConfig, Environment, TrackPayload } from "./types";
+import { isValidString } from "./utils";
 
 export class Delok {
   private apiKey: string;
 
-  private environment: string;
+  private environment: Environment;
 
   constructor(config: DelokConfig) {
+    if (!isValidString(config.apiKey)) {
+      throw new Error("API Key cannot be empty");
+    }
+
     this.apiKey = config.apiKey;
+
     this.environment = config.environment;
   }
 
-  async track(data: TrackPayload) {
+  private async track(data: TrackPayload) {
     return sendLog(this.apiKey, this.environment, data);
   }
 
