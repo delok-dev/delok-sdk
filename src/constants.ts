@@ -31,11 +31,10 @@ export const DEFAULT_REQUEST_TIMEOUT = 5000;
 export const DEFAULT_MAX_RETRIES = 2;
 
 /**
- * Delay (in milliseconds) before attempting another request.
- *
- * This delay is applied only to retry attempts.
+ * Base delay (in milliseconds) used for
+ * calculating exponential backoff between retries.
  */
-export const DEFAULT_RETRY_DELAY = 500;
+export const BASE_RETRY_DELAY = 500;
 
 /**
  * HTTP status codes considered temporary failures.

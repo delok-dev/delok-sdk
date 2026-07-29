@@ -3,15 +3,18 @@
 import {
   DEFAULT_MAX_RETRIES,
   DEFAULT_REQUEST_TIMEOUT,
-  DEFAULT_RETRY_DELAY,
   RETRYABLE_STATUS_CODES,
 } from "./constants";
 import { DelokError } from "./errors/DelokError";
 import { DelokHttpError } from "./errors/DelokHttpError";
 import { DelokNetworkError } from "./errors/DelokNetworkError";
 import { DelokTimeoutError } from "./errors/DelokTimeoutError";
-import { RetryableStatus, SendLogPayload } from "./types";
-import { sleep } from "./utils";
+import {
+  RetryableStatus,
+  SendLogPayload,
+  DelokApiErrorResponse,
+} from "./types";
+import { getRetryDelay, sleep } from "./utils";
 
 /**
  * Sends a log event to the Delok backend.
@@ -45,7 +48,13 @@ export const sendLog = async (payload: SendLogPayload) => {
         throw error;
       }
 
-      await sleep(DEFAULT_RETRY_DELAY);
+      const delay = getRetryDelay(attempt);
+
+      console.info(
+        `Retrying request (${attempt + 1}/${totalAttempts}) in ${delay}ms...`,
+      );
+
+      await sleep(delay);
     }
   }
 };
@@ -94,13 +103,19 @@ const performRequest = async (payload: SendLogPayload) => {
       }),
     });
 
-    // Fetch resolves successfully even for HTTP error responses.
-    // Validate the response explicitly before considering the request successful.
+    // Fetch only rejects on network failures.
+    // HTTP error responses (4xx/5xx) must be checked manually.
     if (!response.ok) {
+      const result: DelokApiErrorResponse = await response.json();
+      const { code, message } = result.error;
       throw new DelokHttpError(
-        `Request failed with HTTP status ${response.status}`,
+        `The Delok server responded with HTTP ${response.status}.`,
         {
           status: response.status,
+          error: {
+            code,
+            message,
+          },
         },
       );
     }

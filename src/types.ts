@@ -79,4 +79,28 @@ export interface DelokHttpErrorMetadata extends DelokErrorMetadata {
    * HTTP status code returned by the Delok backend.
    */
   status: number;
+  error: DelokApiError;
+}
+
+/**
+ * Business error returned by the Delok backend.
+ *
+ * The error code is intended for programmatic handling,
+ * while the message provides a human-readable description.
+ */
+export interface DelokApiError {
+  code: string;
+  message: string;
+}
+
+/**
+ * Standard error response returned by the Delok backend.
+ *
+ * This mirrors the backend API contract and is used
+ * internally by the SDK to extract error information.
+ */
+export interface DelokApiErrorResponse {
+  success: false;
+  error: DelokApiError;
+  timestamp: string;
 }
