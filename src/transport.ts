@@ -99,7 +99,9 @@ const performRequest = async (payload: SendLogPayload) => {
     if (!response.ok) {
       throw new DelokHttpError(
         `Request failed with HTTP status ${response.status}`,
-        response.status,
+        {
+          status: response.status,
+        },
       );
     }
   } catch (error) {
@@ -142,6 +144,8 @@ const shouldRetry = (error: unknown, hasNextAttempt: boolean) => {
     error instanceof DelokTimeoutError ||
     error instanceof DelokNetworkError ||
     (error instanceof DelokHttpError &&
-      RETRYABLE_STATUS_CODES.includes(error.status as RetryableStatus))
+      RETRYABLE_STATUS_CODES.includes(
+        error.metadata?.status as RetryableStatus,
+      ))
   );
 };

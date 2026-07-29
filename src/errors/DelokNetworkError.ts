@@ -1,5 +1,6 @@
 // /src/errors/DelokNetworkError.ts
 
+import { DelokErrorMetadata } from "../types";
 import { DelokError } from "./DelokError";
 
 /**
@@ -7,8 +8,8 @@ import { DelokError } from "./DelokError";
  * from being sent to the Delok backend.
  */
 export class DelokNetworkError extends DelokError {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, metadata?: DelokErrorMetadata) {
+    super(message, metadata);
 
     this.name = "DelokNetworkError";
   }

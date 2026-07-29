@@ -51,3 +51,32 @@ export interface SendLogPayload {
   environment: Environment;
   data: TrackPayload;
 }
+
+/**
+ * Common metadata attached to all Delok SDK errors.
+ *
+ * These values provide additional debugging context
+ * without exposing internal implementation details.
+ */
+export interface DelokErrorMetadata {
+  /**
+   * Total number of request attempts performed,
+   * including the initial request.
+   */
+  attempts?: number;
+  /**
+   * Total time spent (in milliseconds) before
+   * the SDK ultimately failed.
+   */
+  duration?: number;
+}
+
+/**
+ * Additional metadata specific to HTTP errors.
+ */
+export interface DelokHttpErrorMetadata extends DelokErrorMetadata {
+  /**
+   * HTTP status code returned by the Delok backend.
+   */
+  status: number;
+}
