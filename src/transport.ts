@@ -1,40 +1,83 @@
 // /src/transport.ts
 
-import { DEFAULT_REQUEST_TIMEOUT } from "./constants";
+import {
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_REQUEST_TIMEOUT,
+  DEFAULT_RETRY_DELAY,
+  RETRYABLE_STATUS_CODES,
+} from "./constants";
 import { DelokError } from "./errors/DelokError";
+import { DelokHttpError } from "./errors/DelokHttpError";
 import { DelokNetworkError } from "./errors/DelokNetworkError";
 import { DelokTimeoutError } from "./errors/DelokTimeoutError";
-import { TrackPayload } from "./types";
+import { RetryableStatus, SendLogPayload } from "./types";
+import { sleep } from "./utils";
 
 /**
- * Transport layer responsible for communicating with the Delok backend.
+ * Sends a log event to the Delok backend.
+ *
+ * This function is responsible for retrying transient failures
+ * such as network connectivity issues and request timeouts.
+ *
+ * Permanent failures (for example HTTP 400 or invalid API keys)
+ * are returned immediately without retrying.
+ */
+export const sendLog = async (payload: SendLogPayload) => {
+  // Total attempts include the initial request plus any configured retries.
+  //
+  // Example:
+  // DEFAULT_MAX_RETRIES = 2
+  //
+  // Attempt 1
+  // Attempt 2
+  // Attempt 3
+  const totalAttempts = DEFAULT_MAX_RETRIES + 1;
+  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+    // Determine whether another retry attempt is still available.
+    const hasNextAttempt = attempt < totalAttempts;
+    try {
+      await performRequest(payload);
+      return;
+    } catch (error) {
+      // Only retry transient failures.
+      // Permanent errors are immediately propagated to the SDK consumer.
+      if (!shouldRetry(error, hasNextAttempt)) {
+        throw error;
+      }
+
+      await sleep(DEFAULT_RETRY_DELAY);
+    }
+  }
+};
+
+/**
+ * Performs a single HTTP request to the Delok ingestion endpoint.
  *
  * Responsibilities:
- * - Send HTTP requests
  * - Apply request timeout
- * - Convert low-level network errors into SDK-specific errors
+ * - Send the HTTP request
+ * - Validate the HTTP response
+ * - Convert native fetch errors into Delok SDK errors
  *
- * Business validation is intentionally handled by the backend.
+ * This function intentionally performs only one request.
+ * Retry behavior is handled by sendLog().
  */
-export const sendLog = async (
-  apiKey: string,
-  environment: string,
-  data: TrackPayload,
-) => {
-  // AbortController is used to prevent requests from waiting forever.
-  // If the timeout is reached, the request is cancelled and converted
-  // into a DelokTimeoutError.
+const performRequest = async (payload: SendLogPayload) => {
+  // Each request gets its own AbortController so that timeouts
+  // only affect the current attempt.
   const controller = new AbortController();
   const signal = controller.signal;
 
-  // Start the timeout before sending the request so the entire
-  // network operation is protected.
+  // Automatically cancel the request if it exceeds the configured timeout.
+  // This prevents the SDK from waiting indefinitely for a response.
   const requestTimeout = setTimeout(() => {
     controller.abort();
   }, DEFAULT_REQUEST_TIMEOUT);
 
+  // Extract request data needed by the transport layer.
+  const { apiKey, environment, data } = payload;
   try {
-    await fetch("http://localhost:8000/api/ingestion", {
+    const response = await fetch("http://localhost:8000/api/ingestion", {
       signal,
       method: "POST",
 
@@ -50,21 +93,55 @@ export const sendLog = async (
         ...data,
       }),
     });
+
+    // Fetch resolves successfully even for HTTP error responses.
+    // Validate the response explicitly before considering the request successful.
+    if (!response.ok) {
+      throw new DelokHttpError(
+        `Request failed with HTTP status ${response.status}`,
+        response.status,
+      );
+    }
   } catch (error) {
-    // Hide fetch implementation details by converting native errors
-    // into Delok SDK errors.
+    // Errors already converted into Delok SDK errors should be
+    // propagated without additional wrapping.
+    if (error instanceof DelokError) {
+      throw error;
+    }
+
     if (error instanceof Error) {
+      // Convert the native AbortError into a Delok-specific timeout error.
       if (error.name === "AbortError") {
         throw new DelokTimeoutError(
           `Request timeout after ${DEFAULT_REQUEST_TIMEOUT} seconds`,
         );
       } else {
+        // Any remaining native fetch errors are treated as network failures.
         throw new DelokNetworkError("Network error when sending log");
       }
     }
+
+    throw error;
   } finally {
-    // Always clean up the timer regardless of success or failure
-    // to avoid unnecessary timers remaining in memory.
+    // Always clear the timeout to prevent unnecessary timers
+    // from remaining active after the request completes.
     clearTimeout(requestTimeout);
   }
+};
+
+/**
+ * Determines whether the failed request should
+ * be retried based on the error type and the
+ * remaining retry attempts.
+ */
+const shouldRetry = (error: unknown, hasNextAttempt: boolean) => {
+  // Stop retrying once all configured attempts have been exhausted.
+  if (!hasNextAttempt) return false;
+
+  return (
+    error instanceof DelokTimeoutError ||
+    error instanceof DelokNetworkError ||
+    (error instanceof DelokHttpError &&
+      RETRYABLE_STATUS_CODES.includes(error.status as RetryableStatus))
+  );
 };

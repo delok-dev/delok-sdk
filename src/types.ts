@@ -1,10 +1,25 @@
 // /src/types.ts
 
-import { SUPPORTED_ENVIRONMENTS, SUPPORTED_LOG_LEVELS } from "./constants";
+import {
+  RETRYABLE_STATUS_CODES,
+  SUPPORTED_ENVIRONMENTS,
+  SUPPORTED_LOG_LEVELS,
+} from "./constants";
 
+/**
+ * Allowed runtime environments supported by the SDK.
+ */
 export type Environment = (typeof SUPPORTED_ENVIRONMENTS)[number];
 
+/**
+ * Fixed log levels exposed by the SDK.
+ */
 export type LogLevel = (typeof SUPPORTED_LOG_LEVELS)[number];
+
+/**
+ * HTTP status codes eligible for automatic retry.
+ */
+export type RetryableStatus = (typeof RETRYABLE_STATUS_CODES)[number];
 
 /**
  * Configuration required to initialize the Delok SDK.
@@ -25,4 +40,14 @@ export interface TrackPayload {
 
   message?: string;
   payload?: Record<string, unknown>;
+}
+
+/**
+ * Internal payload passed from the SDK entry point
+ * to the transport layer.
+ */
+export interface SendLogPayload {
+  apiKey: string;
+  environment: Environment;
+  data: TrackPayload;
 }

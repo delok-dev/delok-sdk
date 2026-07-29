@@ -44,7 +44,11 @@ export class Delok {
   // Keeping this private ensures developers can only use
   // supported log levels (info, warn, error, fatal).
   private async track(data: TrackPayload) {
-    return sendLog(this.apiKey, this.environment, data);
+    return sendLog({
+      apiKey: this.apiKey,
+      environment: this.environment,
+      data,
+    });
   }
 
   async info(data: Omit<TrackPayload, "level">) {

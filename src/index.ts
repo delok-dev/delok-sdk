@@ -1,8 +1,10 @@
 // /src/index.ts
 
+export { DelokHttpError } from "./errors/DelokHttpError";
+
 export { Delok } from "./Delok";
 
-export type { DelokConfig, TrackPayload, LogLevel } from "./types";
+export type { DelokConfig, TrackPayload, LogLevel, Environment } from "./types";
 
 export { DelokError } from "./errors/DelokError";
 export { DelokConfigurationError } from "./errors/DelokConfigurationError";
