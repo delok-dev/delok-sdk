@@ -104,3 +104,8 @@ export interface DelokApiErrorResponse {
   error: DelokApiError;
   timestamp: string;
 }
+
+export interface RequestContext {
+  attempt: number;
+  startedAt: number;
+}

@@ -13,6 +13,7 @@ import {
   RetryableStatus,
   SendLogPayload,
   DelokApiErrorResponse,
+  RequestContext,
 } from "./types";
 import { getRetryDelay, sleep } from "./utils";
 
@@ -35,17 +36,29 @@ export const sendLog = async (payload: SendLogPayload) => {
   // Attempt 2
   // Attempt 3
   const totalAttempts = DEFAULT_MAX_RETRIES + 1;
+
   for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+    // Store request-scoped information so it can be
+    // attached to any error produced during this attempt.
+    const context: RequestContext = {
+      attempt,
+      startedAt: performance.now(),
+    };
     // Determine whether another retry attempt is still available.
     const hasNextAttempt = attempt < totalAttempts;
+
     try {
-      await performRequest(payload);
+      await performRequest(payload, context);
       return;
     } catch (error) {
       // Only retry transient failures.
       // Permanent errors are immediately propagated to the SDK consumer.
       if (!shouldRetry(error, hasNextAttempt)) {
-        throw error;
+        if (error instanceof Error) {
+          throw error;
+        }
+
+        throw new Error("Unknown transport error");
       }
 
       const delay = getRetryDelay(attempt);
@@ -71,7 +84,10 @@ export const sendLog = async (payload: SendLogPayload) => {
  * This function intentionally performs only one request.
  * Retry behavior is handled by sendLog().
  */
-const performRequest = async (payload: SendLogPayload) => {
+const performRequest = async (
+  payload: SendLogPayload,
+  context: RequestContext,
+) => {
   // Each request gets its own AbortController so that timeouts
   // only affect the current attempt.
   const controller = new AbortController();
@@ -112,6 +128,8 @@ const performRequest = async (payload: SendLogPayload) => {
         `The Delok server responded with HTTP ${response.status}.`,
         {
           status: response.status,
+          attempts: context.attempt,
+          duration: performance.now() - context.startedAt,
           error: {
             code,
             message,
@@ -131,10 +149,17 @@ const performRequest = async (payload: SendLogPayload) => {
       if (error.name === "AbortError") {
         throw new DelokTimeoutError(
           `Request timeout after ${DEFAULT_REQUEST_TIMEOUT} seconds`,
+          {
+            attempts: context.attempt,
+            duration: performance.now() - context.startedAt,
+          },
         );
       } else {
         // Any remaining native fetch errors are treated as network failures.
-        throw new DelokNetworkError("Network error when sending log");
+        throw new DelokNetworkError("Network error when sending log", {
+          attempts: context.attempt,
+          duration: performance.now() - context.startedAt,
+        });
       }
     }
 
