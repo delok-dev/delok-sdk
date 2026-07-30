@@ -1,26 +1,26 @@
 # Delok SDK
 
-Delok SDK is a lightweight logging client for sending application events to the Delok Observability Platform.
+Delok SDK is a lightweight TypeScript logging client for sending structured application events to the Delok Observability Platform.
 
-It allows developers to track application activities, errors, warnings, and custom events with a simple API.
+The SDK provides automatic retries, request timeouts, typed errors, and a simple developer-friendly API for integrating application logging.
 
 ---
 
-## Installation
+# Installation
 
-### From NPM (Coming Soon)
+## From npm (Coming Soon)
 
 ```bash
 npm install delok
 ```
 
-### Local Development
+## Local Development
 
 ```bash
 npm pack
 ```
 
-Then install the generated package:
+Install the generated package:
 
 ```bash
 npm install ./delok-1.0.0.tgz
@@ -28,22 +28,22 @@ npm install ./delok-1.0.0.tgz
 
 ---
 
-## Quick Start
+# Quick Start
 
 ```ts
 import { Delok } from "delok";
 
 const delok = new Delok({
-  apiKey: "dlok_xxxxxxxxxxxxxxxxx",
+  apiKey: process.env.DELOK_API_KEY!,
   environment: "development",
 });
 ```
 
 ---
 
-## Sending Logs
+# Sending Logs
 
-### Info
+## Info
 
 ```ts
 await delok.info({
@@ -52,7 +52,7 @@ await delok.info({
 });
 ```
 
-### Warning
+## Warning
 
 ```ts
 await delok.warn({
@@ -61,7 +61,7 @@ await delok.warn({
 });
 ```
 
-### Error
+## Error
 
 ```ts
 await delok.error({
@@ -73,7 +73,7 @@ await delok.error({
 });
 ```
 
-### Fatal
+## Fatal
 
 ```ts
 await delok.fatal({
@@ -84,50 +84,12 @@ await delok.fatal({
 
 ---
 
-## Custom Events
-
-For advanced use cases, logs can be sent directly using `track()`.
-
-```ts
-await delok.track({
-  level: "info",
-  event: "custom_event",
-  message: "Custom application event",
-  payload: {
-    feature: "dashboard",
-  },
-});
-```
-
----
-
-## Log Structure
-
-Every log sent through the SDK is transformed into the following structure:
-
-```json
-{
-  "environment": "production",
-  "level": "error",
-  "event": "payment_failed",
-  "message": "Payment process failed",
-  "occurredAt": "2026-07-15T12:00:00.000Z",
-  "payload": {
-    "orderId": "123"
-  }
-}
-```
-
----
-
-## Configuration
-
-### DelokConfig
+# Configuration
 
 ```ts
 type DelokConfig = {
   apiKey: string;
-  environment: string;
+  environment: "development" | "staging" | "production";
 };
 ```
 
@@ -142,60 +104,142 @@ const delok = new Delok({
 
 ---
 
-## API Reference
+# Log Payload
 
-### track()
-
-Low-level method used internally by the SDK.
+Each log contains structured application data.
 
 ```ts
-delok.track({
-  level: "info",
-  event: "custom_event",
+{
+  event: string;
+  message?: string;
+  payload?: Record<string, unknown>;
+}
+```
+
+Example:
+
+```ts
+await delok.info({
+  event: "user_created",
+  message: "User registration completed",
+  payload: {
+    userId: "123",
+    plan: "pro",
+  },
 });
 ```
 
-### info()
+The SDK automatically enriches the payload before sending it to the Delok backend.
 
-```ts
-delok.info({
-  event: "user_login",
-});
-```
-
-### warn()
-
-```ts
-delok.warn({
-  event: "rate_limit_warning",
-});
-```
-
-### error()
-
-```ts
-delok.error({
-  event: "payment_failed",
-});
-```
-
-### fatal()
-
-```ts
-delok.fatal({
-  event: "database_crash",
-});
+```json
+{
+  "environment": "production",
+  "level": "info",
+  "event": "user_created",
+  "message": "User registration completed",
+  "occurredAt": "2026-07-30T12:00:00.000Z",
+  "payload": {
+    "userId": "123",
+    "plan": "pro"
+  }
+}
 ```
 
 ---
 
-## Current Features
+# Retry Behavior
 
-* Send logs to Delok backend
-* API key authentication
-* Environment tagging
-* Structured payload support
-* TypeScript support
-* ESM and CommonJS builds
+The SDK automatically retries transient failures.
+
+Retry is performed for:
+
+- Network failures
+- Request timeouts
+- HTTP 500
+- HTTP 502
+- HTTP 503
+- HTTP 504
+
+The SDK does **not** retry permanent failures such as:
+
+- HTTP 400
+- HTTP 401
+- HTTP 403
+- HTTP 404
+
+Retries use exponential backoff.
+
+Example:
+
+```
+Attempt 1
+↓
+500 ms
+
+Attempt 2
+↓
+1000 ms
+
+Attempt 3
+```
 
 ---
+
+# Error Handling
+
+All SDK-specific errors extend `DelokError`.
+
+```ts
+try {
+  await delok.info({
+    event: "user_login",
+  });
+} catch (error) {
+  if (error instanceof DelokError) {
+    console.log(error.message);
+    console.log(error.metadata);
+  }
+}
+```
+
+## Error Types
+
+| Error                   | Description                          |
+| ----------------------- | ------------------------------------ |
+| DelokConfigurationError | Invalid SDK configuration            |
+| DelokNetworkError       | Network connectivity failure         |
+| DelokTimeoutError       | Request exceeded timeout             |
+| DelokHttpError          | Delok backend returned an HTTP error |
+
+---
+
+# Error Metadata
+
+Some errors include additional diagnostic information.
+
+Example:
+
+```ts
+try {
+    await delok.info(...);
+}
+catch (error) {
+    if (error instanceof DelokHttpError) {
+        console.log(error.metadata);
+    }
+}
+```
+
+Example metadata:
+
+```ts
+{
+  status: 401,
+  attempts: 1,
+  duration: 87.4,
+  error: {
+    code: "INVALID_API_KEY",
+    message: "Invalid API key"
+  }
+}
+```

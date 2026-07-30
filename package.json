@@ -1,14 +1,43 @@
 {
   "name": "delok",
-  "version": "1.0.0",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for sending logs to the Delok Observability Platform.",
+  "license": "MIT",
+  "author": "Yuanda Dhama Prandita",
+  "homepage": "https://github.com/yuandadhama/delok-sdk#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuandadhama/delok-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yuandadhama/delok-sdk/issues"
+  },
+  "keywords": [
+    "delok",
+    "logging",
+    "observability",
+    "monitoring",
+    "typescript",
+    "sdk"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts"
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
   },
-  "dependencies": {
-    "zod": "^4.4.3"
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

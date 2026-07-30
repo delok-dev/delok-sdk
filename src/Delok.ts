@@ -51,6 +51,15 @@ export class Delok {
     });
   }
 
+  /**
+   * Send an informational log event.
+   *
+   * Informational logs represent normal application behavior
+   * and are typically used for operational events such as
+   * application startup, user actions, or successful requests.
+   *
+   * @param data Log event payload.
+   */
   async info(data: Omit<TrackPayload, "level">) {
     return this.track({
       level: "info",
@@ -58,6 +67,15 @@ export class Delok {
     });
   }
 
+  /**
+   * Send a warning log event.
+   *
+   * Warning logs indicate unexpected situations that do not
+   * prevent the application from continuing to operate but
+   * may require attention.
+   *
+   * @param data Log event payload.
+   */
   async warn(data: Omit<TrackPayload, "level">) {
     return this.track({
       level: "warn",
@@ -65,6 +83,14 @@ export class Delok {
     });
   }
 
+  /**
+   * Send an error log event.
+   *
+   * Error logs represent failures that affect a specific
+   * operation but do not necessarily terminate the application.
+   *
+   * @param data Log event payload.
+   */
   async error(data: Omit<TrackPayload, "level">) {
     return this.track({
       level: "error",
@@ -72,6 +98,14 @@ export class Delok {
     });
   }
 
+  /**
+   * Send a fatal log event.
+   *
+   * Fatal logs indicate unrecoverable failures that may cause
+   * the application or process to terminate unexpectedly.
+   *
+   * @param data Log event payload.
+   */
   async fatal(data: Omit<TrackPayload, "level">) {
     return this.track({
       level: "fatal",
