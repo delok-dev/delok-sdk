@@ -1,0 +1,73 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Delok } from "../src/Delok";
+import { DelokError } from "../src/errors/DelokError";
+
+describe("Public API", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("exposes only info/warn/error/fatal via package entry, not track", async () => {
+    // Dynamic import of index to verify re-exports
+    const index = await import("../src/index");
+    expect(index).toHaveProperty("Delok");
+    expect(index).not.toHaveProperty("sendLog");
+    expect((index as any).track).toBeUndefined();
+    // Delok instance should not expose track as public
+    const delok = new Delok({ apiKey: "k", environment: "development" });
+    expect((delok as any).track).toBeDefined(); // private exists as function but not intended public
+    // but prototype should not document track as public; check that public methods exist
+    expect(typeof delok.info).toBe("function");
+    expect(typeof delok.warn).toBe("function");
+    expect(typeof delok.error).toBe("function");
+    expect(typeof delok.fatal).toBe("function");
+  });
+
+  it("info/warn/error/fatal produce correct level internally", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as any);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const delok = new Delok({ apiKey: "k", environment: "development" });
+
+    await delok.info({ event: "user_login" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as any).body).level).toBe("info");
+
+    fetchMock.mockClear();
+    await delok.warn({ event: "payment_retry" });
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as any).body).level).toBe("warn");
+
+    fetchMock.mockClear();
+    await delok.error({ event: "payment_failed" });
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as any).body).level).toBe("error");
+
+    fetchMock.mockClear();
+    await delok.fatal({ event: "database_crash" });
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as any).body).level).toBe("fatal");
+  });
+
+  it("returns Promise<void> that resolves to undefined on success", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as any));
+    const delok = new Delok({ apiKey: "k", environment: "development" });
+    const result = await delok.info({ event: "evt" });
+    expect(result).toBeUndefined();
+  });
+
+  it("validates event is non-empty (fails fast, no fetch)", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true } as any));
+    vi.stubGlobal("fetch", fetchMock);
+    const delok = new Delok({ apiKey: "k", environment: "development" });
+    await expect(delok.info({ event: "" })).rejects.toThrow(DelokError);
+    await expect(delok.info({ event: "   " })).rejects.toThrow(DelokError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("sends endpoint from config", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as any);
+    vi.stubGlobal("fetch", fetchMock);
+    const custom = "https://custom.example.com/ingest";
+    const delok = new Delok({ apiKey: "k", environment: "development", endpoint: custom });
+    await delok.info({ event: "evt" });
+    expect(fetchMock).toHaveBeenCalledWith(custom, expect.anything());
+  });
+});

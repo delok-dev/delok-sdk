@@ -1,7 +1,8 @@
 // /src/Delok.ts
 
-import { SUPPORTED_ENVIRONMENTS } from "./constants";
+import { DEFAULT_ENDPOINT, SUPPORTED_ENVIRONMENTS } from "./constants";
 import { DelokConfigurationError } from "./errors/DelokConfigurationError";
+import { DelokError } from "./errors/DelokError";
 import { sendLog } from "./transport";
 
 import { DelokConfig, Environment, TrackPayload } from "./types";
@@ -40,6 +41,8 @@ export class Delok {
 
   private environment: Environment;
 
+  private endpoint: string;
+
   /**
    * Creates a new Delok client.
    *
@@ -49,7 +52,8 @@ export class Delok {
    * @param config - Configuration for the client.
    * @param config.apiKey - API key used to authenticate with the Delok ingestion API. Must be a non-empty string.
    * @param config.environment - Runtime environment for all logs. Must be one of `"development"`, `"staging"`, or `"production"`.
-   * @throws {DelokConfigurationError} When `apiKey` is empty/whitespace-only or `environment` is not one of the supported values.
+   * @param config.endpoint - Optional custom ingestion endpoint URL. Defaults to `http://localhost:8000/api/ingestion`.
+   * @throws {DelokConfigurationError} When `apiKey` is empty/whitespace-only, `environment` is not one of the supported values, `endpoint` is provided but empty, or `event` is empty (at call time).
    *
    * @example
    * ```ts
@@ -70,15 +74,26 @@ export class Delok {
       );
     }
 
+    if (config.endpoint !== undefined && !isValidString(config.endpoint)) {
+      throw new DelokConfigurationError("Endpoint cannot be empty.");
+    }
+
     this.apiKey = config.apiKey;
 
     this.environment = config.environment;
+
+    this.endpoint = config.endpoint ?? DEFAULT_ENDPOINT;
   }
 
   private async track(data: TrackPayload) {
+    if (!isValidString(data.event)) {
+      throw new DelokError("Event name cannot be empty.");
+    }
+
     return sendLog({
       apiKey: this.apiKey,
       environment: this.environment,
+      endpoint: this.endpoint,
       data,
     });
   }

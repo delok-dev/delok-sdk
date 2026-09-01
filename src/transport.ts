@@ -52,18 +52,24 @@ export const sendLog = async (payload: SendLogPayload) => {
       // Only retry transient failures.
       // Permanent errors are immediately propagated to the SDK consumer.
       if (!shouldRetry(error, hasNextAttempt)) {
-        if (error instanceof Error) {
+        if (error instanceof DelokError) {
           throw error;
         }
 
-        throw new Error("Unknown transport error");
+        if (error instanceof Error) {
+          throw new DelokError(error.message, {
+            attempts: context.attempt,
+            duration: performance.now() - context.startedAt,
+          });
+        }
+
+        throw new DelokError("Unknown transport error", {
+          attempts: context.attempt,
+          duration: performance.now() - context.startedAt,
+        });
       }
 
       const delay = getRetryDelay(attempt);
-
-      console.info(
-        `Retrying request (${attempt + 1}/${totalAttempts}) in ${delay}ms...`,
-      );
 
       await sleep(delay);
     }
@@ -92,9 +98,9 @@ const performRequest = async (
   }, DEFAULT_REQUEST_TIMEOUT);
 
   // Extract request data needed by the transport layer.
-  const { apiKey, environment, data } = payload;
+  const { apiKey, environment, endpoint, data } = payload;
   try {
-    const response = await fetch("http://localhost:8000/api/ingestion", {
+    const response = await fetch(endpoint, {
       signal,
       method: "POST",
 
@@ -114,18 +120,24 @@ const performRequest = async (
     // Fetch only rejects on network failures.
     // HTTP error responses (4xx/5xx) must be checked manually.
     if (!response.ok) {
-      const result: DelokApiErrorResponse = await response.json();
-      const { code, message } = result.error;
+      let apiError: { code: string; message: string };
+      try {
+        const result: DelokApiErrorResponse = await response.json();
+        apiError = { code: result.error.code, message: result.error.message };
+      } catch {
+        // Response body is not valid JSON — preserve the HTTP status and use a fallback error.
+        apiError = {
+          code: "UNKNOWN_ERROR",
+          message: response.statusText || `HTTP ${response.status}`,
+        };
+      }
       throw new DelokHttpError(
         `The Delok server responded with HTTP ${response.status}.`,
         {
           status: response.status,
           attempts: context.attempt,
           duration: performance.now() - context.startedAt,
-          error: {
-            code,
-            message,
-          },
+          error: apiError,
         },
       );
     }
@@ -140,7 +152,7 @@ const performRequest = async (
       // Convert the native AbortError into a Delok-specific timeout error.
       if (error.name === "AbortError") {
         throw new DelokTimeoutError(
-          `Request timeout after ${DEFAULT_REQUEST_TIMEOUT} seconds`,
+          `Request timeout after ${DEFAULT_REQUEST_TIMEOUT}ms`,
           {
             attempts: context.attempt,
             duration: performance.now() - context.startedAt,
@@ -155,7 +167,10 @@ const performRequest = async (
       }
     }
 
-    throw error;
+    throw new DelokError(String(error), {
+      attempts: context.attempt,
+      duration: performance.now() - context.startedAt,
+    });
   } finally {
     // Always clear the timeout to prevent unnecessary timers
     // from remaining active after the request completes.

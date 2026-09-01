@@ -37,6 +37,13 @@ export const DEFAULT_MAX_RETRIES = 2;
 export const BASE_RETRY_DELAY = 500;
 
 /**
+ * Default ingestion endpoint used when no custom endpoint is provided.
+ * MVP default points to local dev server; production consumers should
+ * override via DelokConfig.endpoint.
+ */
+export const DEFAULT_ENDPOINT = "http://localhost:8000/api/ingestion" as const;
+
+/**
  * HTTP status codes considered temporary failures.
  *
  * Requests returning these responses may succeed
