@@ -7,14 +7,14 @@
 Developer call (example):
 
 ```ts
-await delok.info({ event: "user_login", message: "ok", payload: { userId: "1" } });
+delok.info({ event: "user_login", message: "ok", payload: { userId: "1" } });
 ```
 
-Implementation — `src/Delok.ts:87` (`info`), `124` (`warn`), `162` (`error`), `200` (`fatal`):
+Implementation — `src/Delok.ts` (`info`, `warn`, `error`, `fatal`):
 
 ```ts
-async info(data: Omit<TrackPayload, "level">): Promise<void> {
-  return this.track({ level: "info", ...data });
+info(data: Omit<TrackPayload, "level">): void {
+  void this.track({ level: "info", ...data }).catch(() => {});
 }
 ```
 
@@ -165,8 +165,8 @@ const shouldRetry = (error, hasNextAttempt) =>
 
 ## 6. Completion
 
-* **Success:** `performRequest` returns `void`, `sendLog` returns `void`, `info/warn/error/fatal` resolves `Promise<void>`. No response body is returned to caller.
-* **Failure:** `sendLog` re-throws the last `DelokError` (now always a `DelokError`); caller receives rejected `Promise`. No swallowing.
+* **Success:** `performRequest` returns `void`, `sendLog` returns `void`, `info/warn/error/fatal` returns `void` immediately. No response body is returned to caller.
+* **Failure:** `sendLog` rejects; the public method handles the rejection internally without unhandled rejection or console output. If the process exits before delivery, in-flight logs may be lost (no `flush()`).
 
 ## 7. Sequence Diagram
 
@@ -187,7 +187,7 @@ performRequest src/transport.ts:85
   ├─ catch non-Error → DelokError
   └─ finally clearTimeout
   │
-  ├─ success → return void (resolves)
-  └─ failure → shouldRetry? ──yes──▶ sleep(backoff 500/1000) → next attempt
-                     └──no───▶ throw Delok*Error (rejects, now always DelokError)
+   ├─ success → return void
+    └─ failure → shouldRetry? ──yes──▶ sleep(backoff 500/1000) → next attempt
+                       └──no───▶ throw Delok*Error → handled internally (no unhandled rejection)
 ```

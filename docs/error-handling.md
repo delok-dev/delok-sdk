@@ -30,13 +30,13 @@ All SDK errors are `instanceof DelokError`. Endpoint removal does not introduce 
 
 ## 3. Payload Validation Error
 
-**When:** `await delok.info({event: ""})` — `src/Delok.ts:71`.
+**When:** `delok.info({event: ""})` — `src/Delok.ts` `track()`.
 
-* `!isValidString(data.event)` → `DelokError("Event name cannot be empty.")` — base class, not retryable.
+* `!isValidString(data.event)` → `DelokError("Event name cannot be empty.")` — base class, not retryable. Handled internally without unhandled rejection.
 
 ## 4. Request Errors (transport)
 
-All other errors are asynchronous — `await delok.info()` rejects. Each carries `metadata: {attempts, duration}` plus extra fields for HTTP. Endpoint being internal does not change error shapes.
+All other errors are asynchronous delivery failures — `delok.info()` returns `void` immediately and failures are handled internally after retries. Each error carries `metadata: {attempts, duration}` plus extra fields for HTTP. No Promise is returned to the caller and no console output is produced.
 
 ### 4.1 Timeout — `DelokTimeoutError`
 
@@ -73,15 +73,19 @@ interface DelokHttpErrorMetadata extends DelokErrorMetadata { status: number; er
 
 ## 6. Consumer Handling Pattern
 
+Logging is fire-and-forget:
+
 ```ts
-import { Delok, DelokError, DelokHttpError } from "delok";
-try {
-  await delok.info({ event: "user_login" });
-} catch (e) {
-  if (e instanceof DelokHttpError) { /* status */ }
-  else if (e instanceof DelokError) { /* network/timeout/event/unknown */ }
-}
+import { Delok } from "delok";
+const delok = new Delok({
+  apiKey: process.env.DELOK_API_KEY!,
+  environment: "production",
+});
+
+delok.info({ event: "user_login" });
 ```
+
+Failures are handled internally and do not require `await` or `catch`. Constructor validation still throws synchronously and can be caught with `try/catch`.
 
 ### Endpoint removal note
 

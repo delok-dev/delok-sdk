@@ -2,7 +2,7 @@
 
 Delok SDK is a lightweight TypeScript logging client for sending structured application events to the Delok Observability Platform.
 
-The SDK provides automatic retries, request timeouts, typed errors, and a simple developer-friendly API for integrating application logging.
+The SDK provides automatic retries, request timeouts, typed errors, and a simple fire-and-forget developer-friendly API for integrating application logging.
 
 ---
 
@@ -43,10 +43,12 @@ const delok = new Delok({
 
 # Sending Logs
 
+Logging is fire-and-forget — methods return `void` immediately and perform HTTP delivery asynchronously in the background. The application does not need to `await` log calls.
+
 ## Info
 
 ```ts
-await delok.info({
+delok.info({
   event: "user_login",
   message: "User successfully logged in",
 });
@@ -55,7 +57,7 @@ await delok.info({
 ## Warning
 
 ```ts
-await delok.warn({
+delok.warn({
   event: "payment_retry",
   message: "Payment gateway timeout",
 });
@@ -64,7 +66,7 @@ await delok.warn({
 ## Error
 
 ```ts
-await delok.error({
+delok.error({
   event: "payment_failed",
   message: "Payment process failed",
   payload: {
@@ -76,7 +78,7 @@ await delok.error({
 ## Fatal
 
 ```ts
-await delok.fatal({
+delok.fatal({
   event: "database_crash",
   message: "Primary database is unavailable",
 });
@@ -119,7 +121,7 @@ Each log contains structured application data.
 Example:
 
 ```ts
-await delok.info({
+delok.info({
   event: "user_created",
   message: "User registration completed",
   payload: {
@@ -189,15 +191,22 @@ Attempt 3
 
 All SDK-specific errors extend `DelokError`.
 
+Logging methods are fire-and-forget and do not throw or reject. Delivery failures are handled internally:
+
+```ts
+delok.info({
+  event: "user_login",
+});
+```
+
+The application does not need to `await` or `catch` logging calls. Constructor validation errors are thrown synchronously:
+
 ```ts
 try {
-  await delok.info({
-    event: "user_login",
-  });
+  const delok = new Delok({ apiKey: "", environment: "production" });
 } catch (error) {
-  if (error instanceof DelokError) {
-    console.log(error.message);
-    console.log(error.metadata);
+  if (error instanceof DelokConfigurationError) {
+    console.error("Invalid SDK config:", error.message);
   }
 }
 ```
@@ -217,19 +226,6 @@ try {
 
 Some errors include additional diagnostic information.
 
-Example:
-
-```ts
-try {
-    await delok.info(...);
-}
-catch (error) {
-    if (error instanceof DelokHttpError) {
-        console.log(error.metadata);
-    }
-}
-```
-
 Example metadata:
 
 ```ts
@@ -243,3 +239,9 @@ Example metadata:
   }
 }
 ```
+
+---
+
+# Delivery Guarantees
+
+Logging is fire-and-forget and delivered asynchronously. The SDK does not buffer logs to disk and does not provide a `flush()` method. If the Node.js process exits before delivery completes, logs in flight may be lost.

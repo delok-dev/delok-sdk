@@ -73,7 +73,6 @@ export interface DelokConfig {
    * @example "production"
    */
   environment: Environment;
-
 }
 
 /**
@@ -88,7 +87,7 @@ export interface DelokConfig {
  *
  * @example
  * ```ts
- * await delok.info({
+ * delok.info({
  *   event: "user_login",
  *   message: "User successfully logged in",
  *   payload: { userId: "123" },

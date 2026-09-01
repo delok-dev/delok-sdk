@@ -15,7 +15,7 @@ Both are intentionally minimal — no queue, no persistence — to keep the SDK 
 
 ### 2.1 Problem
 
-`fetch` has no built-in timeout. Without one, a hung ingestion endpoint (`DEFAULT_ENDPOINT` internal) would leave `await delok.info()` pending indefinitely.
+`fetch` has no built-in timeout. Without one, a hung ingestion endpoint (`DEFAULT_ENDPOINT` internal) would leave the internal delivery pending indefinitely (though the public method returns `void` immediately, resources would still be held).
 
 ### 2.2 Implementation
 
