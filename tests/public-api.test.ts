@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Delok } from "../src/Delok";
 import { DelokError } from "../src/errors/DelokError";
+import { DEFAULT_ENDPOINT } from "../src/constants";
 
 describe("Public API", () => {
   beforeEach(() => {
@@ -62,12 +63,31 @@ describe("Public API", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("sends endpoint from config", async () => {
+  it("uses internal Delok ingestion endpoint, not developer config", async () => {
     const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as any);
     vi.stubGlobal("fetch", fetchMock);
-    const custom = "https://custom.example.com/ingest";
-    const delok = new Delok({ apiKey: "k", environment: "development", endpoint: custom });
+    const delok = new Delok({ apiKey: "k", environment: "development" });
     await delok.info({ event: "evt" });
-    expect(fetchMock).toHaveBeenCalledWith(custom, expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith(DEFAULT_ENDPOINT, expect.anything());
+  });
+
+  it("cannot override endpoint through public config — evil endpoint is ignored", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as any);
+    vi.stubGlobal("fetch", fetchMock);
+    const delok = new Delok({
+      apiKey: "k",
+      environment: "development",
+      endpoint: "https://evil.example.com/api/ingestion",
+    } as any);
+    await delok.info({ event: "evt" });
+    // Should still use internal endpoint, not evil
+    expect(fetchMock).toHaveBeenCalledWith(DEFAULT_ENDPOINT, expect.anything());
+    expect(fetchMock).not.toHaveBeenCalledWith("https://evil.example.com/api/ingestion", expect.anything());
+  });
+
+  it("public DelokConfig type does not include endpoint (verified via index exports)", async () => {
+    const index = await import("../src/index");
+    // DEFAULT_ENDPOINT is internal and not exported via public index
+    expect((index as any).DEFAULT_ENDPOINT).toBeUndefined();
   });
 });

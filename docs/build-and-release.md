@@ -22,10 +22,6 @@
 }
 ```
 
-* `strict: true` — SDK code is fully strict.
-* `declaration: true` — `.d.ts` emitted, but actual declaration emission is handled by `tsup` (uses `dts` plugin wrapping `tsc`).
-* `target ES2022` — matches modern Node 18+ and browsers; no downleveling for older runtimes.
-
 ### tsup — no `tsup.config.*`
 
 Build command is inline in `package.json:40`:
@@ -38,20 +34,20 @@ Build command is inline in `package.json:40`:
 * **Entry:** `src/index.ts` — single entry, all public symbols re-exported there.
 * **Formats:** `esm` → `dist/index.mjs`, `cjs` → `dist/index.js`.
 * **Declarations:** `--dts` → `dist/index.d.ts` + `dist/index.d.mts` (dual).
-* **No config file** — no `tsup.config.ts`. All options are CLI flags. Adding shims, external, or splitting would require a config file.
+* **No config file** — no `tsup.config.ts`. All options are CLI flags.
+* Endpoint removal does not affect build — `DEFAULT_ENDPOINT` remains internal, not exported via `src/index.ts`.
 
-### Build Output (verified via `npm run build`)
+### Build Output
 
 ```
 dist/
-├── index.js       # CJS 14.19 KB (post-hardening, +endpoint)
+├── index.js       # CJS 14.19 KB
 ├── index.mjs      # ESM 12.98 KB
 ├── index.d.ts     # CJS types 18.59 KB
 └── index.d.mts    # ESM types 18.59 KB
 ```
 
-No sourcemaps (`--sourcemap` not passed). No minification (default `tsup` keeps readable output).
-Tests: `npm test` → vitest run, 26 tests (config 8, public-api 5, transport 13), config via `vitest.config.ts`.
+Tests: `npm test` → vitest run, 26 tests (config 6, public-api 7, transport 13), config via `vitest.config.ts`.
 
 ## 2. Package Metadata — `package.json:1`
 
@@ -68,9 +64,7 @@ Tests: `npm test` → vitest run, 26 tests (config 8, public-api 5, transport 13
 }
 ```
 
-* `exports` field enables dual `import`/`require` resolution — `import {Delok} from "delok"` resolves to `.mjs`, `require` to `.js`.
-* `files` whitelist ensures only `dist` + docs ship — `src` not published.
-* `prepublishOnly` guarantees `dist` is fresh on `npm publish` / `npm pack`.
+* `DEFAULT_ENDPOINT` is **not** in `files` nor `exports` — internal constant, not public. `src/index.ts` does not re-export it (verified: `DEFAULT_ENDPOINT` not in `dist/index.d.ts` public surface).
 
 ## 3. How Source Becomes Package
 
@@ -78,15 +72,8 @@ Tests: `npm test` → vitest run, 26 tests (config 8, public-api 5, transport 13
 npm run build
   └─ tsup src/index.ts --format esm,cjs --dts
        ├─ esbuild bundle src/index.ts + deps → dist/index.mjs (ESM)
-       ├─ esbuild bundle src/index.ts + deps → dist/index.js (CJS)
-       └─ dts plugin (tsc + rollup) → dist/index.d.ts/.d.mts
-
-npm pack / npm publish
-  └─ prepublishOnly → rebuild
-  └─ files ["dist","README.md","LICENSE"] + package.json → tarball `delok-0.1.0.tgz`
+       └─ dts plugin → dist/index.d.ts/.d.mts
 ```
-
-Install verification: `npm pack` produces `delok-0.1.0.tgz` (also `delok.tgz` in repo root — artifact, not source). Consumer install via `npm install delok` or `npm install ./delok-0.1.0.tgz` (README:23).
 
 ## 4. Public Types in Distribution
 
@@ -94,15 +81,16 @@ Install verification: `npm pack` produces `delok-0.1.0.tgz` (also `delok.tgz` in
 
 ```
 Delok, DelokError, DelokConfigurationError, DelokHttpError, DelokNetworkError, DelokTimeoutError,
-types: DelokConfig, TrackPayload, LogLevel, Environment, DelokErrorMetadata, DelokHttpErrorMetadata, DelokApiError
+types: DelokConfig {apiKey, environment}, TrackPayload, LogLevel, Environment, DelokErrorMetadata, DelokHttpErrorMetadata, DelokApiError
 ```
 
-Internal types `SendLogPayload`, `RequestContext`, `RetryableStatus`, `DelokApiErrorResponse` are present in emit but not re-exported — visible only if consumer inspects deep imports (should not).
+Internal types `SendLogPayload {apiKey, environment, data}`, `RequestContext`, `RetryableStatus`, `DelokApiErrorResponse`, and constant `DEFAULT_ENDPOINT` are not re-exported — internal only. Verified: `DelokConfig` in `dist/index.d.ts` has only `apiKey` + `environment`.
 
 ## 5. Gaps and Maintenance Notes
 
 * **No `tsup.config.ts`** — adding `external`, `splitting`, `onSuccess` would require one.
 * **No sourcemaps** — debugging `dist` stack traces maps to bundled JS, not original TS. Consider `--sourcemap`.
-* **`engines` added** — now `>=18` for `fetch`/`AbortController`. CI still none.
-* **No CI** — no `.github/workflows`. Tests now exist (`npm test`) but not run on push; add workflow to run `npm test && npm run build`.
-* **Endpoint now configurable** — `config.endpoint` optional; default still `localhost` for MVP compat; production should override.
+* **`engines >=18`** for `fetch`/`AbortController`.
+* **No CI** — no `.github/workflows`. Tests now exist (`npm test`) but not run on push.
+* **Endpoint internal** — `DEFAULT_ENDPOINT` is `http://localhost:8000/api/ingestion` actual implementation (local MVP placeholder). Not configurable via `DelokConfig` by design. Production deployment should update the constant internally, not expose via config.
+

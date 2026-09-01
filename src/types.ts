@@ -74,18 +74,6 @@ export interface DelokConfig {
    */
   environment: Environment;
 
-  /**
-   * Custom ingestion endpoint URL.
-   *
-   * Optional. When not provided, the SDK uses the default endpoint
-   * (`http://localhost:8000/api/ingestion` for local MVP). Production
-   * consumers should set this to the Delok Cloud endpoint.
-   *
-   * Must be a non-empty string if provided; whitespace-only values are rejected.
-   *
-   * @example "https://ingest.delok.dev/api/ingestion"
-   */
-  endpoint?: string;
 }
 
 /**
@@ -160,7 +148,6 @@ export interface TrackPayload {
 export interface SendLogPayload {
   apiKey: string;
   environment: Environment;
-  endpoint: string;
   data: TrackPayload;
 }
 

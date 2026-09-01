@@ -10,7 +10,7 @@ Developer call (example):
 await delok.info({ event: "user_login", message: "ok", payload: { userId: "1" } });
 ```
 
-Implementation — `src/Delok.ts:117` (`info`), `154` (`warn`), `192` (`error`), `231` (`fatal`):
+Implementation — `src/Delok.ts:87` (`info`), `124` (`warn`), `162` (`error`), `200` (`fatal`):
 
 ```ts
 async info(data: Omit<TrackPayload, "level">): Promise<void> {
@@ -20,23 +20,23 @@ async info(data: Omit<TrackPayload, "level">): Promise<void> {
 
 * The method injects the fixed `level` and spreads caller `data`.
 * `level` is never caller-supplied; the `Omit` enforces this at the type level.
-* Minimal payload validation now in `track()` — empty `event` fails before network.
+* `event` validation happens next in `track()` — empty `event` fails before network.
 
 ## 2. Internal Delegation: `private track()`
 
-`src/Delok.ts:94`:
+`src/Delok.ts:71`:
 
 ```ts
 private async track(data: TrackPayload) {
   if (!isValidString(data.event)) throw new DelokError("Event name cannot be empty.");
-  return sendLog({ apiKey: this.apiKey, environment: this.environment, endpoint: this.endpoint, data });
+  return sendLog({ apiKey: this.apiKey, environment: this.environment, data });
 }
 ```
 
 * Validates `event` via `isValidString` `src/utils.ts:9` — whitespace/empty fails fast with `DelokError`.
-* Combines stored config (`this.apiKey`, `this.environment`, `this.endpoint` — set in `constructor` `src/Delok.ts:62`) with the `TrackPayload`.
-* Produces `SendLogPayload` (`src/types.ts:155`) — internal type, never exposed via `src/index.ts`.
-* Tested: `tests/public-api.test.ts` validates event and endpoint propagation.
+* Combines stored developer config (`this.apiKey`, `this.environment` — set in `constructor` `src/Delok.ts:46`) with the `TrackPayload`. **No endpoint** — endpoint is SDK infrastructure, not developer config.
+* Produces `SendLogPayload` (`src/types.ts:160`) — `{apiKey, environment, data}` internal type, never exposed via `src/index.ts`.
+* Tested: `tests/public-api.test.ts` validates event and that internal endpoint is used.
 
 ## 3. Transport Entry: `sendLog`
 
@@ -63,13 +63,13 @@ export const sendLog = async (payload: SendLogPayload) => {
 
 * `RequestContext` (`src/types.ts:239`) captures `attempt` and `startedAt` for error metadata (per-attempt).
 * `totalAttempts = 3` (1 initial + 2 retries). Not consumer-configurable.
-* **No `console.info`** — retry logging removed (see reliability.md). Previously `console.info` at old `src/transport.ts:64` deleted.
-* Unknown `Error` now normalized to `DelokError` (was `new Error("Unknown transport error")`); non-`Error` throwables now wrapped as `DelokError(String(error))` — see error-handling.md.
+* **No `console.info`** — retry logging removed. No SDK writes to app console on retry.
+* Unknown `Error` now normalized to `DelokError`.
 * Return is `void` — success is silent. All failures propagate as `DelokError` subclass or base.
 
 ## 4. Single Attempt: `performRequest`
 
-`src/transport.ts:90` — per-attempt HTTP:
+`src/transport.ts:85` — per-attempt HTTP:
 
 ### 4.1 Timeout setup
 
@@ -79,12 +79,12 @@ setTimeout(() => controller.abort(), DEFAULT_REQUEST_TIMEOUT); // 5000ms src/con
 ```
 
 * New `AbortController` per attempt — timeout does not leak across retries.
-* Timer cleared in `finally` `src/transport.ts:173` to avoid dangling timers.
+* Timer cleared in `finally` `src/transport.ts:175` to avoid dangling timers.
 
 ### 4.2 Request construction
 
 ```ts
-await fetch(endpoint, { // from SendLogPayload, defaults to DEFAULT_ENDPOINT src/constants.ts:48
+await fetch(DEFAULT_ENDPOINT, { // internal SDK-controlled endpoint src/constants.ts:40
   signal,
   method: "POST",
   headers: { "Content-Type": "application/json", "x-api-key": apiKey },
@@ -92,10 +92,10 @@ await fetch(endpoint, { // from SendLogPayload, defaults to DEFAULT_ENDPOINT src
 });
 ```
 
-* **Endpoint:** `endpoint` from `SendLogPayload` (`src/Delok.ts:95`), which is `config.endpoint ?? DEFAULT_ENDPOINT`. No longer hardcoded literal in `fetch` call. Tested in `tests/public-api.test.ts`.
-* **Auth:** `x-api-key` header, value is raw `apiKey` string (`src/transport.ts:117`).
+* **Endpoint:** `DEFAULT_ENDPOINT = "http://localhost:8000/api/ingestion"` internal constant `src/constants.ts:40`, imported directly in `transport.ts:5`. **Not** from `DelokConfig` or `SendLogPayload`. The lifecycle is `DelokConfig → Delok → track() → sendLog() → performRequest() → internal endpoint` (see configuration.md). Attempting to pass `endpoint` via `DelokConfig` is ignored — tested in `tests/public-api.test.ts`.
+* **Auth:** `x-api-key` header, value is raw `apiKey` string (`src/transport.ts:113`).
 * **Body:** spreads `data` (`event`, `level`, `message?`, `payload?`) plus `environment` from config and `occurredAt: new Date()` generated at request time.
-* **Serialization:** `Date` becomes ISO string via `JSON.stringify`. No custom serializer.
+* **Serialization:** `Date` becomes ISO string via `JSON.stringify`.
 
 ### 4.3 Response handling
 
@@ -115,7 +115,7 @@ if (!response.ok) {
 ```
 
 * `fetch` only rejects on network failure; HTTP 4xx/5xx inspected manually.
-* **Hardened:** `response.json()` now wrapped in `try/catch` to preserve HTTP status when body is not valid JSON (e.g., HTML 502 page). Previously a SyntaxError was caught as generic `Error` and mapped to `DelokNetworkError`, losing status. Now status is preserved with `UNKNOWN_ERROR` fallback. Verified by `tests/transport.test.ts` ("preserves status on invalid JSON error response").
+* `response.json()` wrapped in `try/catch` to preserve HTTP status when body is not valid JSON — fallback `UNKNOWN_ERROR`.
 * `attempts` and `duration` stamped from `RequestContext` (per-attempt).
 
 ### 4.4 Error mapping (catch block)
@@ -132,9 +132,9 @@ else throw new DelokNetworkError("Network error when sending log", { attempts, d
 ```
 
 * `DelokError` instances pass through unchanged.
-* `AbortError` from `AbortController` → `DelokTimeoutError` with correct `ms` unit.
-* Any other native `Error` (TypeError from fetch, etc.) → `DelokNetworkError`.
-* Non-`Error` throwables → `DelokError(String(error))` — now normalized, was raw `throw error`.
+* `AbortError` → `DelokTimeoutError` with correct `ms` unit.
+* Any other native `Error` → `DelokNetworkError`.
+* Non-`Error` throwables → `DelokError(String(error))` — normalized.
 
 ### 4.5 Cleanup
 
@@ -146,7 +146,7 @@ Ensures timer does not fire after success/failure.
 
 ## 5. Retry Decision: `shouldRetry`
 
-`src/transport.ts:179`:
+`src/transport.ts:181`:
 
 ```ts
 const shouldRetry = (error, hasNextAttempt) =>
@@ -157,10 +157,10 @@ const shouldRetry = (error, hasNextAttempt) =>
   );
 ```
 
-* `RETRYABLE_STATUS_CODES = [500,502,503,504]` `src/constants.ts:57`.
+* `RETRYABLE_STATUS_CODES = [500,502,503,504]` `src/constants.ts:49`.
 * Permanent `DelokHttpError` (400,401,403,404, etc.) → never retried.
-* `DelokError` from event validation → not retryable (not in predicate) → fails fast.
-* `DelokConfigurationError` never reaches here (thrown before transport).
+* `DelokError` from event validation → not retryable → fails fast.
+* `DelokConfigurationError` never reaches here.
 * If `hasNextAttempt === false`, always `false` — exhaustion propagates.
 
 ## 6. Completion
@@ -171,16 +171,16 @@ const shouldRetry = (error, hasNextAttempt) =>
 ## 7. Sequence Diagram
 
 ```
-delok.info({event}) 
-  │ track({level:"info",...}) + event validation src/Delok.ts:94
-  │ → if empty event: throw DelokError (no fetch)
-  ▼
+info()/warn()/error()/fatal()
+        ↓
+private track() + event validation src/Delok.ts:71
+        ↓  SendLogPayload {apiKey, environment, data} (no endpoint)
 sendLog loop attempt=1..3 src/transport.ts:38
-  │ context={attempt, startedAt}
-  ▼
-performRequest src/transport.ts:90
+        │ context={attempt, startedAt}
+        ▼
+performRequest src/transport.ts:85
   ├─ AbortController + setTimeout 5000ms
-  ├─ fetch POST endpoint (config or DEFAULT_ENDPOINT) + headers + body
+  ├─ fetch POST internal DEFAULT_ENDPOINT (src/constants.ts:40) + headers + body
   ├─ if !ok → try parse JSON else UNKNOWN_ERROR fallback → DelokHttpError
   ├─ catch AbortError → DelokTimeoutError (5000ms)
   ├─ catch other Error → DelokNetworkError

@@ -1,6 +1,6 @@
 // /src/Delok.ts
 
-import { DEFAULT_ENDPOINT, SUPPORTED_ENVIRONMENTS } from "./constants";
+import { SUPPORTED_ENVIRONMENTS } from "./constants";
 import { DelokConfigurationError } from "./errors/DelokConfigurationError";
 import { DelokError } from "./errors/DelokError";
 import { sendLog } from "./transport";
@@ -41,8 +41,6 @@ export class Delok {
 
   private environment: Environment;
 
-  private endpoint: string;
-
   /**
    * Creates a new Delok client.
    *
@@ -52,8 +50,7 @@ export class Delok {
    * @param config - Configuration for the client.
    * @param config.apiKey - API key used to authenticate with the Delok ingestion API. Must be a non-empty string.
    * @param config.environment - Runtime environment for all logs. Must be one of `"development"`, `"staging"`, or `"production"`.
-   * @param config.endpoint - Optional custom ingestion endpoint URL. Defaults to `http://localhost:8000/api/ingestion`.
-   * @throws {DelokConfigurationError} When `apiKey` is empty/whitespace-only, `environment` is not one of the supported values, `endpoint` is provided but empty, or `event` is empty (at call time).
+   * @throws {DelokConfigurationError} When `apiKey` is empty/whitespace-only or `environment` is not one of the supported values.
    *
    * @example
    * ```ts
@@ -74,15 +71,9 @@ export class Delok {
       );
     }
 
-    if (config.endpoint !== undefined && !isValidString(config.endpoint)) {
-      throw new DelokConfigurationError("Endpoint cannot be empty.");
-    }
-
     this.apiKey = config.apiKey;
 
     this.environment = config.environment;
-
-    this.endpoint = config.endpoint ?? DEFAULT_ENDPOINT;
   }
 
   private async track(data: TrackPayload) {
@@ -93,7 +84,6 @@ export class Delok {
     return sendLog({
       apiKey: this.apiKey,
       environment: this.environment,
-      endpoint: this.endpoint,
       data,
     });
   }

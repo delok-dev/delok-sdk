@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Delok } from "../src/Delok";
 import { DelokConfigurationError } from "../src/errors/DelokConfigurationError";
-import { DEFAULT_ENDPOINT } from "../src/constants";
 
 describe("Delok configuration", () => {
   it("creates instance with valid config", () => {
@@ -23,23 +22,21 @@ describe("Delok configuration", () => {
     expect(() => new Delok({ apiKey: "k", environment: "invalid" as any })).toThrow(DelokConfigurationError);
   });
 
-  it("defaults endpoint to DEFAULT_ENDPOINT when not provided", async () => {
+  it("does not expose endpoint in DelokConfig — extra endpoint property is ignored", () => {
+    // Developer should not be able to configure endpoint through public API.
+    // Passing endpoint via any should not create a private endpoint field nor affect construction.
+    const delok = new Delok({ apiKey: "k", environment: "development", endpoint: "https://evil.com" } as any);
+    expect((delok as any).endpoint).toBeUndefined();
+    // Still constructs successfully — endpoint is not validated as config
+    expect(delok).toBeInstanceOf(Delok);
+  });
+
+  it("Delok instance does not store endpoint as developer-controlled state", () => {
     const delok = new Delok({ apiKey: "k", environment: "development" });
-    // access private field via any for test
-    expect((delok as any).endpoint).toBe(DEFAULT_ENDPOINT);
-  });
-
-  it("uses custom endpoint when provided", () => {
-    const custom = "https://ingest.example.com/api/ingestion";
-    const delok = new Delok({ apiKey: "k", environment: "production", endpoint: custom });
-    expect((delok as any).endpoint).toBe(custom);
-  });
-
-  it("throws when endpoint is empty string", () => {
-    expect(() => new Delok({ apiKey: "k", environment: "production", endpoint: "" })).toThrow(DelokConfigurationError);
-  });
-
-  it("throws when endpoint is whitespace-only", () => {
-    expect(() => new Delok({ apiKey: "k", environment: "production", endpoint: "   " })).toThrow(DelokConfigurationError);
+    // endpoint is internal infrastructure, not developer config
+    expect((delok as any).apiKey).toBe("k");
+    expect((delok as any).environment).toBe("development");
+    // No endpoint field should exist on instance
+    expect("endpoint" in delok).toBe(false);
   });
 });

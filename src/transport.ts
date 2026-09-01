@@ -1,6 +1,7 @@
 // /src/transport.ts
 
 import {
+  DEFAULT_ENDPOINT,
   DEFAULT_MAX_RETRIES,
   DEFAULT_REQUEST_TIMEOUT,
   RETRYABLE_STATUS_CODES,
@@ -98,9 +99,9 @@ const performRequest = async (
   }, DEFAULT_REQUEST_TIMEOUT);
 
   // Extract request data needed by the transport layer.
-  const { apiKey, environment, endpoint, data } = payload;
+  const { apiKey, environment, data } = payload;
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(DEFAULT_ENDPOINT, {
       signal,
       method: "POST",
 
