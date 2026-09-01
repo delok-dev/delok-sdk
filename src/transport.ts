@@ -18,13 +18,11 @@ import {
 import { getRetryDelay, sleep } from "./utils";
 
 /**
- * Sends a log event to the Delok backend.
+ * @internal
+ * Sends a log event to the Delok backend with built-in timeout
+ * and limited retry for transient failures.
  *
- * This function is responsible for retrying transient failures
- * such as network connectivity issues and request timeouts.
- *
- * Permanent failures (for example HTTP 400 or invalid API keys)
- * are returned immediately without retrying.
+ * Permanent failures (e.g. HTTP 400, invalid API keys) are not retried.
  */
 export const sendLog = async (payload: SendLogPayload) => {
   // Total attempts include the initial request plus any configured retries.
@@ -73,16 +71,10 @@ export const sendLog = async (payload: SendLogPayload) => {
 };
 
 /**
- * Performs a single HTTP request to the Delok ingestion endpoint.
- *
- * Responsibilities:
- * - Apply request timeout
- * - Send the HTTP request
- * - Validate the HTTP response
- * - Convert native fetch errors into Delok SDK errors
- *
- * This function intentionally performs only one request.
- * Retry behavior is handled by sendLog().
+ * @internal
+ * Performs a single HTTP request to the ingestion endpoint.
+ * Applies request timeout and converts fetch errors into SDK errors.
+ * Retry is handled by the caller.
  */
 const performRequest = async (
   payload: SendLogPayload,
@@ -171,11 +163,7 @@ const performRequest = async (
   }
 };
 
-/**
- * Determines whether the failed request should
- * be retried based on the error type and the
- * remaining retry attempts.
- */
+/** @internal - decides whether a failed attempt should be retried. */
 const shouldRetry = (error: unknown, hasNextAttempt: boolean) => {
   // Stop retrying once all configured attempts have been exhausted.
   if (!hasNextAttempt) return false;
