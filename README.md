@@ -2,28 +2,12 @@
 
 Delok SDK is a lightweight TypeScript logging client for sending structured application events to the Delok Observability Platform.
 
-The SDK provides automatic retries, request timeouts, typed errors, and a simple fire-and-forget developer-friendly API for integrating application logging.
-
 ---
 
 # Installation
 
-## From npm (Coming Soon)
-
 ```bash
 npm install delok
-```
-
-## Local Development
-
-```bash
-npm pack
-```
-
-Install the generated package:
-
-```bash
-npm install ./delok-1.0.0.tgz
 ```
 
 ---
@@ -42,8 +26,6 @@ const delok = new Delok({
 ---
 
 # Sending Logs
-
-Logging is fire-and-forget — methods return `void` immediately and perform HTTP delivery asynchronously in the background. The application does not need to `await` log calls.
 
 ## Info
 
@@ -149,44 +131,6 @@ The SDK automatically enriches the payload before sending it to the Delok backen
 
 ---
 
-# Retry Behavior
-
-The SDK automatically retries transient failures.
-
-Retry is performed for:
-
-- Network failures
-- Request timeouts
-- HTTP 500
-- HTTP 502
-- HTTP 503
-- HTTP 504
-
-The SDK does **not** retry permanent failures such as:
-
-- HTTP 400
-- HTTP 401
-- HTTP 403
-- HTTP 404
-
-Retries use exponential backoff.
-
-Example:
-
-```
-Attempt 1
-↓
-500 ms
-
-Attempt 2
-↓
-1000 ms
-
-Attempt 3
-```
-
----
-
 # Error Handling
 
 All SDK-specific errors extend `DelokError`.
@@ -239,9 +183,3 @@ Example metadata:
   }
 }
 ```
-
----
-
-# Delivery Guarantees
-
-Logging is fire-and-forget and delivered asynchronously. The SDK does not buffer logs to disk and does not provide a `flush()` method. If the Node.js process exits before delivery completes, logs in flight may be lost.

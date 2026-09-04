@@ -5,19 +5,16 @@ import { DelokErrorMetadata } from "../types";
 /**
  * Base class for all errors thrown by the Delok SDK.
  *
- * Every SDK-specific error extends this class, so you can handle all
- * Delok failures in a single catch block. Each instance may carry
- * optional {@link DelokErrorMetadata} with diagnostic context such as
- * the number of attempts and total duration.
+ * Every SDK-specific error extends this class. Configuration errors are
+ * thrown synchronously when creating a client.
  *
  * @example
  * ```ts
  * try {
- *   await delok.info({ event: "user_login" });
+ *   const delok = new Delok({ apiKey: "", environment: "production" });
  * } catch (error) {
  *   if (error instanceof DelokError) {
  *     console.error(error.message);
- *     console.error(error.metadata?.attempts);
  *   }
  * }
  * ```
