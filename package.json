@@ -1,6 +1,6 @@
 {
   "name": "@delok/sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Official TypeScript SDK for sending logs to the Delok Observability Platform.",
   "license": "MIT",
   "author": "Yuanda Dhama Prandita",
