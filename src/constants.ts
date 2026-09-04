@@ -48,7 +48,7 @@ export const BASE_RETRY_DELAY = 500;
  * expose it through `DelokConfig` or public exports.
  */
 export const DEFAULT_ENDPOINT =
-  "https://delok-api.up.railway.app/ingestion" as const;
+  "https://delok-api.up.railway.app/api/ingestion" as const;
 
 /**
  * HTTP status codes considered temporary failures.
