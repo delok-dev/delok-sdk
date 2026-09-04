@@ -1,6 +1,6 @@
 # Delok SDK
 
-Delok SDK is a lightweight TypeScript logging client for sending structured application events to the Delok Observability Platform.
+Delok SDK is a lightweight TypeScript logging client for sending structured application events to the Delok Platform.
 
 ---
 
