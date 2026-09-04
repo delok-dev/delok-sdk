@@ -2,8 +2,6 @@
 
 A lightweight TypeScript SDK for sending structured application logs to the Delok Platform.
 
-Delok SDK provides a simple interface for application logging while handling request delivery, payload enrichment, and delivery errors internally.
-
 ## Installation
 
 ```bash
@@ -199,27 +197,6 @@ Example:
 ```
 
 The available metadata depends on the error type and the stage at which the failure occurred.
-
-## Runtime Behavior
-
-The SDK is designed so that logging remains non-blocking for the host application.
-
-```text
-Application
-    │
-    ├── delok.info(...)
-    ├── delok.warn(...)
-    ├── delok.error(...)
-    └── delok.fatal(...)
-             │
-             ▼
-        Delok SDK
-             │
-             ▼
-        Delok Ingestion API
-```
-
-Application code can continue executing without waiting for log delivery to complete.
 
 ## License
 
