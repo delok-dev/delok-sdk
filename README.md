@@ -1,21 +1,19 @@
 # Delok SDK
 
-Delok SDK is a lightweight TypeScript logging client for sending structured application events to the Delok Platform.
+A lightweight TypeScript SDK for sending structured application logs to the Delok Platform.
 
----
+Delok SDK provides a simple interface for application logging while handling request delivery, payload enrichment, and delivery errors internally.
 
-# Installation
+## Installation
 
 ```bash
-npm install delok
+npm install @delok/sdk
 ```
 
----
-
-# Quick Start
+## Quick Start
 
 ```ts
-import { Delok } from "delok";
+import { Delok } from "@delok/sdk";
 
 const delok = new Delok({
   apiKey: process.env.DELOK_API_KEY!,
@@ -23,11 +21,13 @@ const delok = new Delok({
 });
 ```
 
----
+Once initialized, the SDK can be used to send application logs.
 
-# Sending Logs
+## Sending Logs
 
-## Info
+### Info
+
+Use `info()` for normal application events.
 
 ```ts
 delok.info({
@@ -36,7 +36,9 @@ delok.info({
 });
 ```
 
-## Warning
+### Warning
+
+Use `warn()` for conditions that may require attention but do not necessarily indicate a failure.
 
 ```ts
 delok.warn({
@@ -45,7 +47,9 @@ delok.warn({
 });
 ```
 
-## Error
+### Error
+
+Use `error()` for application errors and failed operations.
 
 ```ts
 delok.error({
@@ -57,7 +61,9 @@ delok.error({
 });
 ```
 
-## Fatal
+### Fatal
+
+Use `fatal()` for critical failures that may indicate a severe application or infrastructure issue.
 
 ```ts
 delok.fatal({
@@ -66,9 +72,9 @@ delok.fatal({
 });
 ```
 
----
+## Configuration
 
-# Configuration
+The SDK is initialized with a `DelokConfig` object.
 
 ```ts
 type DelokConfig = {
@@ -86,18 +92,18 @@ const delok = new Delok({
 });
 ```
 
----
+The SDK uses its configured API key and environment to associate logs with the appropriate Delok project.
 
-# Log Payload
+## Log Payload
 
-Each log contains structured application data.
+Each logging method accepts a structured log object.
 
 ```ts
-{
+type LogPayload = {
   event: string;
   message?: string;
   payload?: Record<string, unknown>;
-}
+};
 ```
 
 Example:
@@ -113,7 +119,9 @@ delok.info({
 });
 ```
 
-The SDK automatically enriches the payload before sending it to the Delok backend.
+The SDK enriches the submitted data with additional metadata before sending it to the Delok backend.
+
+A resulting event may contain fields such as:
 
 ```json
 {
@@ -129,13 +137,11 @@ The SDK automatically enriches the payload before sending it to the Delok backen
 }
 ```
 
----
+## Error Handling
 
-# Error Handling
+Logging methods are designed to be fire-and-forget.
 
-All SDK-specific errors extend `DelokError`.
-
-Logging methods are fire-and-forget and do not throw or reject. Delivery failures are handled internally:
+They do not throw or reject when log delivery fails. Network failures, timeouts, and HTTP errors are handled internally by the SDK so logging failures do not interrupt the host application.
 
 ```ts
 delok.info({
@@ -143,34 +149,42 @@ delok.info({
 });
 ```
 
-The application does not need to `await` or `catch` logging calls. Constructor validation errors are thrown synchronously:
+No `await` or `try/catch` is required for logging calls.
+
+### Configuration Errors
+
+Invalid SDK configuration is validated when the client is created and throws synchronously.
 
 ```ts
+import { Delok, DelokConfigurationError } from "@delok/sdk";
+
 try {
-  const delok = new Delok({ apiKey: "", environment: "production" });
+  const delok = new Delok({
+    apiKey: "",
+    environment: "production",
+  });
 } catch (error) {
   if (error instanceof DelokConfigurationError) {
-    console.error("Invalid SDK config:", error.message);
+    console.error("Invalid SDK configuration:", error.message);
   }
 }
 ```
 
-## Error Types
+### Error Types
 
-| Error                   | Description                          |
-| ----------------------- | ------------------------------------ |
-| DelokConfigurationError | Invalid SDK configuration            |
-| DelokNetworkError       | Network connectivity failure         |
-| DelokTimeoutError       | Request exceeded timeout             |
-| DelokHttpError          | Delok backend returned an HTTP error |
+| Error                     | Description                              |
+| ------------------------- | ---------------------------------------- |
+| `DelokError`              | Base class for SDK-specific errors       |
+| `DelokConfigurationError` | Invalid SDK configuration                |
+| `DelokNetworkError`       | Network connectivity failure             |
+| `DelokTimeoutError`       | Request exceeded the configured timeout  |
+| `DelokHttpError`          | The Delok backend returned an HTTP error |
 
----
+## Error Metadata
 
-# Error Metadata
+Some SDK errors expose additional metadata to help diagnose delivery failures.
 
-Some errors include additional diagnostic information.
-
-Example metadata:
+Example:
 
 ```ts
 {
@@ -183,3 +197,30 @@ Example metadata:
   }
 }
 ```
+
+The available metadata depends on the error type and the stage at which the failure occurred.
+
+## Runtime Behavior
+
+The SDK is designed so that logging remains non-blocking for the host application.
+
+```text
+Application
+    │
+    ├── delok.info(...)
+    ├── delok.warn(...)
+    ├── delok.error(...)
+    └── delok.fatal(...)
+             │
+             ▼
+        Delok SDK
+             │
+             ▼
+        Delok Ingestion API
+```
+
+Application code can continue executing without waiting for log delivery to complete.
+
+## License
+
+Licensed under the MIT License.
